@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Vencer</string>
+    <string name="accessibility_label">Bloqueador Guardião Vencer</string>
+    <string name="accessibility_description">O Guardião Vencer monitora e bloqueia sites e pesquisas de conteúdo pornográfico no seu celular para ajudar na sua recuperação.</string>
+</resources>

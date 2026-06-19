@@ -1,0 +1,6 @@
+{
+  "name": "Vencer",
+  "description": "Aplicativo para ajudar vencer a pornografia com rastreador de sobriedade, conselheiro IA e bloqueador guardião em Moçambique.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
