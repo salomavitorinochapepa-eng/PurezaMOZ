@@ -1,1376 +1,919 @@
 package com.example.ui
 
+import android.accessibilityservice.AccessibilityService
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
-import androidx.compose.animation.*
-import androidx.compose.foundation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.ParentLog
-import com.example.notification.InspirationNotificationHelper
-import com.example.ui.theme.*
+import com.example.ui.theme.CardBackground
 import java.text.SimpleDateFormat
 import java.util.*
-
-
-// Define ChildProfile at the top of the file
-data class ChildProfile(
-    val name: String,
-    val email: String,
-    val screenTimeLimit: Float = 2.0f,
-    val currentScreenTime: Float = 0.5f,
-    val autoFilterEnabled: Boolean = true,
-    val blockExceeded: Boolean = true
-) {
-    fun toSerializedString(): String {
-        return "$name;;$email;;$screenTimeLimit;;$currentScreenTime;;$autoFilterEnabled;;$blockExceeded"
-    }
-
-    companion object {
-        fun fromSerializedString(str: String): ChildProfile? {
-            return try {
-                val parts = str.split(";;")
-                if (parts.size >= 6) {
-                    ChildProfile(
-                        name = parts[0],
-                        email = parts[1],
-                        screenTimeLimit = parts[2].toFloatOrNull() ?: 2.0f,
-                        currentScreenTime = parts[3].toFloatOrNull() ?: 0.5f,
-                        autoFilterEnabled = parts[4].toBooleanStrictOrNull() ?: true,
-                        blockExceeded = parts[5].toBooleanStrictOrNull() ?: true
-                    )
-                } else null
-            } catch (e: Exception) {
-                null
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParentModeScreen(
     viewModel: VencerViewModel,
-    onSwitchProfile: () -> Unit
+    onBack: () -> Unit,
+    onUpgradeClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val sharedPrefs = remember { context.getSharedPreferences("vencer_prefs", Context.MODE_PRIVATE) }
-    
-    // Load list of child profiles from preferences or defaults
-    var childProfiles by remember {
-        val saved = sharedPrefs.getString("parent_child_profiles", null)
-        val list = if (saved != null) {
-            saved.split("##").mapNotNull { ChildProfile.fromSerializedString(it) }
-        } else emptyList()
-        
+    val blockerSettings by viewModel.blockerSettings.collectAsState()
+    val parentLogs by viewModel.parentLogs.collectAsState()
+    val isPasscodeCorrect by viewModel.isPasscodeCorrect.collectAsState()
+
+    // Premium States
+    val isPremiumUnlocked by viewModel.isPremiumUnlocked.collectAsState()
+    val isTrialExpired by viewModel.isTrialExpired.collectAsState()
+    val mpesaNumber by viewModel.mpesaNumber.collectAsState()
+    val mpesaName by viewModel.mpesaName.collectAsState()
+
+    var showPremiumDialog by remember { mutableStateOf(false) }
+    var passcodeField by remember { mutableStateOf("") }
+    var emailField by remember { 
         mutableStateOf(
-            if (list.isNotEmpty()) list else listOf(
-                ChildProfile("Eduardo", "eduardo@gmail.com", 2.0f, 1.8f, true, true),
-                ChildProfile("Sara", "sara@gmail.com", 3.0f, 0.5f, true, true)
-            )
+            context.getSharedPreferences("vencer_prefs", Context.MODE_PRIVATE)
+                .getString("parent_child_email", "eduardo@gmail.com") ?: "eduardo@gmail.com"
         )
     }
 
-    // Currently selected child email
-    var selectedChildEmail by remember {
-        mutableStateOf(sharedPrefs.getString("parent_selected_child_email", "eduardo@gmail.com") ?: "eduardo@gmail.com")
+    var showEmailSavedMessage by remember { mutableStateOf(false) }
+    
+    // Premium editing states
+    var editMpesaNumber by remember(mpesaNumber) { mutableStateOf(mpesaNumber) }
+    var editMpesaName by remember(mpesaName) { mutableStateOf(mpesaName) }
+    var showPaymentSavedMessage by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.resetPasscodeVerification()
     }
 
-    // Helper to find index or active child
-    val activeChild = childProfiles.find { it.email == selectedChildEmail } ?: childProfiles.firstOrNull() ?: ChildProfile("Eduardo", "eduardo@gmail.com")
+    val isPasscodeConfigured = blockerSettings != null && blockerSettings?.parentPasscode?.isNotEmpty() == true
 
-    // Bind current child specific parameters
-    val automaticFilterEnabled = activeChild.autoFilterEnabled
-    val blockWhenLimitExceeded = activeChild.blockExceeded
-    val screenTimeLimitHours = activeChild.screenTimeLimit
-    val childScreenTimeHours = activeChild.currentScreenTime
-    val childEmail = activeChild.email
-
-    val saveChildProfiles: (List<ChildProfile>) -> Unit = { list ->
-        childProfiles = list
-        val serialized = list.joinToString("##") { it.toSerializedString() }
-        sharedPrefs.edit().putString("parent_child_profiles", serialized).apply()
-    }
-
-    val updateActiveChild: (ChildProfile) -> Unit = { updated ->
-        val newList = childProfiles.map {
-            if (it.email == updated.email) updated else it
-        }
-        saveChildProfiles(newList)
-        // Keep single backward-compatible keys in sync as well
-        sharedPrefs.edit()
-            .putBoolean("parent_auto_filter", updated.autoFilterEnabled)
-            .putBoolean("parent_lock_limit", updated.blockExceeded)
-            .putFloat("parent_screen_time_limit", updated.screenTimeLimit)
-            .putFloat("parent_child_screen_time", updated.currentScreenTime)
-            .putString("parent_child_email", updated.email)
-            .putString("parent_selected_child_email", updated.email)
-            .apply()
-        
-        // Force recomposition update
-        selectedChildEmail = updated.email
-    }
-
-    val addChild: (String, String, Float) -> Boolean = { name, email, limit ->
-        if (name.isBlank() || email.isBlank()) false
-        else if (childProfiles.any { it.email.lowercase() == email.lowercase() }) false
-        else {
-            val newChild = ChildProfile(name, email, limit, 0.0f, true, true)
-            val newList = childProfiles + newChild
-            saveChildProfiles(newList)
-            updateActiveChild(newChild)
-            true
-        }
-    }
-
-    val removeChild: (ChildProfile) -> Unit = { target ->
-        val newList = childProfiles.filter { it.email != target.email }
-        if (newList.isNotEmpty()) {
-            saveChildProfiles(newList)
-            if (selectedChildEmail == target.email) {
-                val nextActive = newList.first()
-                updateActiveChild(nextActive)
-            }
-        } else {
-            Toast.makeText(context, "Deve manter pelo menos um filho configurado.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // Custom blocked keywords persistence
-    var customKeywordsString by remember {
-        mutableStateOf(sharedPrefs.getString("parent_custom_keywords", "jogos, facebook, apostas") ?: "")
-    }
-
-    // Parent database records
-    val parentLogs by viewModel.parentLogs.collectAsStateWithLifecycle()
-
-    // Screen tabs: 0: Painel de Visão Geral, 1: Histórico de Apanhados, 2: Regras de Bloqueio
-    var currentSubTab by remember { mutableStateOf(0) }
-
-    // Simulator input State
-    var simulationInputText by remember { mutableStateOf("") }
-    var newKeywordInputText by remember { mutableStateOf("") }
-
-    // Function to show real parent alerts and populate DB
-    val triggerParentAlert: (String, String) -> Unit = { query, type ->
-        val alertMessage = "O seu filho (${activeChild.name}) tentou aceder a conteúdo impróprio: \"$query\""
-        InspirationNotificationHelper.showParentAlertNotification(context, alertMessage)
-        viewModel.addParentLog(
-            searchQueryOrUrl = query,
-            actionTaken = "Bloqueado & Alerta Enviado",
-            isAlert = true,
-            childEmail = childEmail
-        )
-        Toast.makeText(context, "🚨 Alerta Real de Conteúdo +18 Activado para ${activeChild.name}!", Toast.LENGTH_LONG).show()
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(LuxuryAmber.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FamilyRestroom,
-                                contentDescription = null,
-                                tint = LuxuryAmber,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Vencer Parental",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = LightText
-                            )
-                            Text(
-                                text = "Controlo & Proteção de Menores",
-                                fontSize = 10.sp,
-                                color = SubLightText
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    Button(
-                        onClick = onSwitchProfile,
-                        colors = ButtonDefaults.buttonColors(containerColor = CardBackground),
-                        border = BorderStroke(1.dp, SubLightText.copy(alpha = 0.3f)),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .height(36.dp)
-                            .testTag("switch_to_recovery_profile_button"),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SwapHoriz,
-                                contentDescription = null,
-                                tint = EmeraldGreen,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text("Mudar Perfil", fontSize = 11.sp, color = LightText)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SlateBackground)
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(SlateBackground)
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp)
+    if (blockerSettings == null) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
         ) {
-            // Horizontal scrollable Tab options for Parent screen
-            Row(
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+    } else if (!isPasscodeConfigured) {
+        // PASSCODE CREATION FLOW
+        var newPasscode by remember { mutableStateOf("") }
+        var confirmPasscode by remember { mutableStateOf("") }
+        var passcodeError by remember { mutableStateOf<String?>(null) }
+
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .fillMaxSize()
+                    .padding(24.dp)
+                    .safeDrawingPadding()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                listOf(
-                    Triple(0, "Painel Ativo", Icons.Default.Dashboard),
-                    Triple(1, "Histórico Net", Icons.Default.History),
-                    Triple(2, "Restrições", Icons.Default.Settings)
-                ).forEach { (index, title, icon) ->
-                    val isSelected = currentSubTab == index
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { currentSubTab = index }
-                            .testTag("parent_tab_pill_$index"),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) EmeraldGreen.copy(alpha = 0.15f) else CardBackground
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isSelected) EmeraldGreen else Color.Transparent
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 10.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(64.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Criar Senha do Guardião",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Text(
+                    text = "Para impedir que as restrições e o bloqueador sejam desativados, crie um código PIN exclusivo de 4 a 6 dígitos.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = newPasscode,
+                    onValueChange = { 
+                        if (it.all { char -> char.isDigit() } && it.length <= 6) {
+                            newPasscode = it
+                            passcodeError = null
+                        }
+                    },
+                    label = { Text("Novo PIN (4-6 dígitos)") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(0.8f),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = confirmPasscode,
+                    onValueChange = { 
+                        if (it.all { char -> char.isDigit() } && it.length <= 6) {
+                            confirmPasscode = it
+                            passcodeError = null
+                        }
+                    },
+                    label = { Text("Confirmar PIN") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(0.8f),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    )
+                )
+
+                if (passcodeError != null) {
+                    Text(
+                        text = passcodeError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        if (newPasscode.length < 4) {
+                            passcodeError = "O PIN deve ter no mínimo 4 dígitos."
+                        } else if (newPasscode != confirmPasscode) {
+                            passcodeError = "Os PINs não coincidem!"
+                        } else {
+                            viewModel.savePasscode(newPasscode)
+                            Toast.makeText(context, "Código criado com sucesso! Use o novo código para aceder.", Toast.LENGTH_LONG).show()
+                            newPasscode = ""
+                            confirmPasscode = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(0.8f)
+                ) {
+                    Text("Criar e Ativar Código", fontWeight = FontWeight.Bold)
+                }
+
+                TextButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) {
+                    Text("Voltar ao Painel")
+                }
+            }
+        }
+    } else if (isPasscodeCorrect != true) {
+        // PASSCODE LOCK SCREEN
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
+                    .safeDrawingPadding()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(64.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Acesso Restrito ao Guardião",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Text(
+                    text = "Insira o código PIN de 4 dígitos para gerenciar as configurações do filtro de pureza.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = passcodeField,
+                    onValueChange = { 
+                        if (it.all { char -> char.isDigit() } && it.length <= 6) {
+                            passcodeField = it
+                        }
+                    },
+                    label = { Text("Código PIN") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(0.8f),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    )
+                )
+
+                if (isPasscodeCorrect == false) {
+                    Text(
+                        text = "PIN Incorreto! Tente novamente.",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.verifyPasscode(passcodeField)
+                    },
+                    modifier = Modifier.fillMaxWidth(0.8f)
+                ) {
+                    Text("Confirmar PIN")
+                }
+
+                TextButton(onClick = onBack, modifier = Modifier.padding(top = 16.dp)) {
+                    Text("Voltar ao Painel")
+                }
+            }
+        }
+    } else {
+        // MAIN PARENT SETTINGS SCREEN
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Painel do Guardião", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Voltar")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Section 1: Blocker Config
+                item {
+                    Text(
+                        text = "Configurações do Bloqueador",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                if (!isPremiumUnlocked) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = if (isSelected) EmeraldGreen else SubLightText,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = title,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) LightText else SubLightText,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Recurso Bloqueado no Teste Gratuito",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "O Guardião (Filtro ativo de pornografia) é um recurso exclusivo do Vencer Premium. Durante o teste gratuito de 2 dias você não pode ativá-lo. Pague a licença de 150 MT por 30 dias para poder ativá-lo.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = { showPremiumDialog = true },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.Payment, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Pagar Licença Pro (150 MT)", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            }
 
-            // Main Contents switching based on sub tab
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .testTag("parent_main_lazy_column"),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
-                when (currentSubTab) {
-                    0 -> { // GENERAL PARENTAL DASHBOARD
-                        // 1. Connection status card - now replaced with Management of multiple children
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = CardBackground),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text(
-                                                text = "👥 Gestão de Filhos (${childProfiles.size})",
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = LightText
-                                            )
-                                            Text(
-                                                text = "Configure e bloqueie conteúdo adulto individualmente.",
-                                                fontSize = 10.sp,
-                                                color = SubLightText
-                                            )
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .background(EmeraldGreen.copy(alpha = 0.1f), CircleShape)
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                                        ) {
-                                            Text(
-                                                text = "REAL-TIME SYNC",
-                                                fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = EmeraldGreen
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(14.dp))
-
-                                    // Children list profiles
-                                    Text(
-                                        text = "Toque num filho para alternar o painel e as regras ativas:",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = LuxuryAmber,
-                                        modifier = Modifier.padding(bottom = 6.dp)
-                                    )
-
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        childProfiles.forEach { profile ->
-                                            val isSelected = profile.email == selectedChildEmail
-                                            Card(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable { 
-                                                        updateActiveChild(profile)
-                                                        Toast.makeText(context, "Painel focado em: ${profile.name}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                    .testTag("child_profile_item_${profile.name}"),
-                                                colors = CardDefaults.cardColors(
-                                                    containerColor = if (isSelected) EmeraldGreen.copy(alpha = 0.08f) else SlateBackground.copy(alpha = 0.5f)
-                                                ),
-                                                shape = RoundedCornerShape(12.dp),
-                                                border = BorderStroke(
-                                                    width = 1.dp,
-                                                    color = if (isSelected) EmeraldGreen else Color.Transparent
-                                                )
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(12.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.SpaceBetween
-                                                ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                                    ) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .size(36.dp)
-                                                                .clip(CircleShape)
-                                                                .background(
-                                                                    if (isSelected) EmeraldGreen.copy(alpha = 0.2f) else SubLightText.copy(alpha = 0.15f)
-                                                                ),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = if (isSelected) Icons.Default.ChildCare else Icons.Default.Person,
-                                                                contentDescription = null,
-                                                                tint = if (isSelected) EmeraldGreen else SubLightText,
-                                                                modifier = Modifier.size(18.dp)
-                                                            )
-                                                        }
-
-                                                        Column {
-                                                            Row(
-                                                                verticalAlignment = Alignment.CenterVertically,
-                                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                            ) {
-                                                                Text(
-                                                                    text = profile.name,
-                                                                    fontSize = 13.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    color = LightText
-                                                                )
-                                                                if (isSelected) {
-                                                                    Box(
-                                                                        modifier = Modifier
-                                                                            .background(EmeraldGreen, RoundedCornerShape(4.dp))
-                                                                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                                                                    ) {
-                                                                        Text(
-                                                                            text = "FOCADO",
-                                                                            fontSize = 7.sp,
-                                                                            fontWeight = FontWeight.ExtraBold,
-                                                                            color = SlateBackground
-                                                                        )
-                                                                    }
-                                                                }
-                                                            }
-                                                            Text(
-                                                                text = profile.email,
-                                                                fontSize = 10.sp,
-                                                                color = SubLightText
-                                                            )
-                                                        }
-                                                    }
-
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                    ) {
-                                                        Column(
-                                                            horizontalAlignment = Alignment.End,
-                                                            modifier = Modifier.padding(end = 4.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = "Ecrã: ${profile.currentScreenTime}h / ${profile.screenTimeLimit}h",
-                                                                fontSize = 10.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                color = LightText
-                                                            )
-                                                            Row(
-                                                                verticalAlignment = Alignment.CenterVertically,
-                                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                            ) {
-                                                                Icon(
-                                                                    imageVector = if (profile.autoFilterEnabled) Icons.Default.Security else Icons.Default.Warning,
-                                                                    contentDescription = null,
-                                                                    tint = if (profile.autoFilterEnabled) EmeraldGreen else AlertRed,
-                                                                    modifier = Modifier.size(11.dp)
-                                                                )
-                                                                Text(
-                                                                    text = if (profile.autoFilterEnabled) "Filtro +18 ON" else "Filtro +18 OFF",
-                                                                    fontSize = 9.sp,
-                                                                    color = if (profile.autoFilterEnabled) EmeraldGreen else AlertRed
-                                                                )
-                                                            }
-                                                        }
-
-                                                        // Delete button if profiles count > 1
-                                                        if (childProfiles.size > 1) {
-                                                            IconButton(
-                                                                onClick = {
-                                                                    removeChild(profile)
-                                                                    Toast.makeText(context, "Perfil de ${profile.name} removido.", Toast.LENGTH_SHORT).show()
-                                                                },
-                                                                modifier = Modifier.size(24.dp)
-                                                            ) {
-                                                                Icon(
-                                                                    imageVector = Icons.Default.Delete,
-                                                                    contentDescription = "Remover",
-                                                                    tint = AlertRed.copy(alpha = 0.8f),
-                                                                    modifier = Modifier.size(16.dp)
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(14.dp))
-                                    Divider(color = SubLightText.copy(alpha = 0.1f))
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    // Add child form section
-                                    var showAddChildForm by remember { mutableStateOf(false) }
-
-                                    if (!showAddChildForm) {
-                                        Button(
-                                            onClick = { showAddChildForm = true },
-                                            colors = ButtonDefaults.buttonColors(containerColor = SlateBackground),
-                                            border = BorderStroke(1.dp, LuxuryAmber.copy(alpha = 0.4f)),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .testTag("btn_toggle_add_child_form"),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.PersonAdd,
-                                                contentDescription = null,
-                                                tint = LuxuryAmber,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Adicionar Novo Filho", fontSize = 12.sp, color = LightText, fontWeight = FontWeight.SemiBold)
-                                        }
-                                    } else {
-                                        Card(
-                                            colors = CardDefaults.cardColors(containerColor = SlateBackground.copy(alpha = 0.4f)),
-                                            shape = RoundedCornerShape(8.dp),
-                                            border = BorderStroke(1.dp, SubLightText.copy(alpha = 0.2f)),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Column(modifier = Modifier.padding(12.dp)) {
-                                                Text(
-                                                    text = "Registar Novo Filho",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = LuxuryAmber
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-
-                                                var newNameInput by remember { mutableStateOf("") }
-                                                var newEmailInput by remember { mutableStateOf("") }
-                                                var newLimitInput by remember { mutableStateOf(2.0f) }
-
-                                                OutlinedTextField(
-                                                    value = newNameInput,
-                                                    onValueChange = { newNameInput = it },
-                                                    label = { Text("Nome do Filho", fontSize = 11.sp) },
-                                                    placeholder = { Text("Ex: Lucas", fontSize = 11.sp, color = SubLightText) },
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(55.dp)
-                                                        .testTag("add_child_name_input"),
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        unfocusedBorderColor = SubLightText.copy(alpha = 0.3f),
-                                                        focusedBorderColor = EmeraldGreen,
-                                                        focusedTextColor = LightText,
-                                                        unfocusedTextColor = LightText
-                                                    ),
-                                                    singleLine = true
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-
-                                                OutlinedTextField(
-                                                    value = newEmailInput,
-                                                    onValueChange = { newEmailInput = it },
-                                                    label = { Text("E-mail do Filho", fontSize = 11.sp) },
-                                                    placeholder = { Text("lucas@gmail.com", fontSize = 11.sp, color = SubLightText) },
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(55.dp)
-                                                        .testTag("add_child_email_input"),
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    colors = OutlinedTextFieldDefaults.colors(
-                                                        unfocusedBorderColor = SubLightText.copy(alpha = 0.3f),
-                                                        focusedBorderColor = EmeraldGreen,
-                                                        focusedTextColor = LightText,
-                                                        unfocusedTextColor = LightText
-                                                    ),
-                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                                    singleLine = true
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = "Limite de ecrã: ${newLimitInput.toInt()}h diárias",
-                                                        fontSize = 11.sp,
-                                                        color = LightText
-                                                    )
-                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                        listOf(1f, 2f, 3f, 4f).forEach { hour ->
-                                                            Card(
-                                                                modifier = Modifier
-                                                                    .clickable { newLimitInput = hour },
-                                                                colors = CardDefaults.cardColors(
-                                                                    containerColor = if (newLimitInput == hour) EmeraldGreen else SlateBackground
-                                                                ),
-                                                                border = BorderStroke(0.5.dp, SubLightText.copy(alpha = 0.3f)),
-                                                                shape = RoundedCornerShape(4.dp)
-                                                            ) {
-                                                                Text(
-                                                                    text = "${hour.toInt()}h",
-                                                                    fontSize = 10.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    color = if (newLimitInput == hour) SlateBackground else LightText,
-                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                                )
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                Spacer(modifier = Modifier.height(12.dp))
-
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                ) {
-                                                    Button(
-                                                        onClick = { showAddChildForm = false },
-                                                        colors = ButtonDefaults.buttonColors(containerColor = SlateBackground),
-                                                        shape = RoundedCornerShape(6.dp),
-                                                        modifier = Modifier.weight(1f)
-                                                    ) {
-                                                        Text("Cancelar", fontSize = 11.sp, color = LightText)
-                                                    }
-
-                                                    Button(
-                                                        onClick = {
-                                                            if (newNameInput.trim().isNotEmpty() && newEmailInput.trim().isNotEmpty()) {
-                                                                val succ = addChild(newNameInput.trim(), newEmailInput.trim(), newLimitInput)
-                                                                if (succ) {
-                                                                    Toast.makeText(context, "Filho '${newNameInput}' adicionado e focado!", Toast.LENGTH_SHORT).show()
-                                                                    showAddChildForm = false
-                                                                } else {
-                                                                    Toast.makeText(context, "E-mail duplicado ou dados inválidos.", Toast.LENGTH_SHORT).show()
-                                                                }
-                                                            } else {
-                                                                Toast.makeText(context, "Por favor preencha todos os campos.", Toast.LENGTH_SHORT).show()
-                                                            }
-                                                        },
-                                                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen),
-                                                        shape = RoundedCornerShape(6.dp),
-                                                        modifier = Modifier.weight(1f)
-                                                    ) {
-                                                        Text("Gravar", fontSize = 11.sp, color = SlateBackground, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "Ao registar e focar num filho, todas as interceptações efetuadas pelo serviço e simulações do painel serão geradas e rotuladas especificamente para este filho.",
-                                        fontSize = 10.sp,
-                                        color = SubLightText
-                                    )
-                                }
-                            }
-                        }
-
-                        // 2. Kid's Screen Time Usage Gauge Card
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = CardBackground),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(18.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "Tempo de Ecrã Diário do Filho",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = LightText,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    // Custom Circular Meter Representation
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.size(130.dp)
-                                    ) {
-                                        // Background indicator circle
-                                        CircularProgressIndicator(
-                                            progress = 1f,
-                                            modifier = Modifier.size(120.dp),
-                                            color = SlateBackground,
-                                            strokeWidth = 10.dp
-                                        )
-                                        // Progress color dynamically goes yellow/red if close or exceeding limit
-                                        val ratio = childScreenTimeHours / screenTimeLimitHours
-                                        val progressColor = when {
-                                            ratio >= 1.0f -> AlertRed
-                                            ratio >= 0.8f -> LuxuryAmber
-                                            else -> EmeraldGreen
-                                        }
-                                        
-                                        CircularProgressIndicator(
-                                            progress = ratio.coerceAtMost(1f),
-                                            modifier = Modifier.size(120.dp),
-                                            color = progressColor,
-                                            strokeWidth = 10.dp
-                                        )
-
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(
-                                                text = String.format("%.1f h", childScreenTimeHours),
-                                                fontSize = 24.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = LightText
-                                            )
-                                            Text(
-                                                text = "Limite: ${screenTimeLimitHours.toInt()}h",
-                                                fontSize = 11.sp,
-                                                color = SubLightText
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(14.dp))
-
-                                    // Quick increase simulator for testing
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = if (childScreenTimeHours >= screenTimeLimitHours) "🚨 Limite diário excedido!" else "Dentro do limite autorizado",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = if (childScreenTimeHours >= screenTimeLimitHours) AlertRed else EmeraldGreen
-                                        )
-
-                                        // Button to simulate adding screen time
-                                        Button(
-                                            onClick = {
-                                                val newHour = (childScreenTimeHours + 0.5f)
-                                                val updated = activeChild.copy(currentScreenTime = newHour)
-                                                updateActiveChild(updated)
-                                                if (newHour >= screenTimeLimitHours && blockWhenLimitExceeded) {
-                                                    Toast.makeText(context, "Limite atingido! Ecrã de ${activeChild.name} bloqueado remotamente.", Toast.LENGTH_LONG).show()
-                                                }
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = SlateBackground),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                            modifier = Modifier.height(30.dp),
-                                            shape = RoundedCornerShape(6.dp)
-                                        ) {
-                                            Text("+30 mins (Simular)", fontSize = 10.sp, color = LightText)
-                                        }
-                                    }
-
-                                    // Reset simulation time button
-                                    if (childScreenTimeHours > 0f) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = "Reiniciar tempo simulado",
-                                            fontSize = 11.sp,
-                                            color = SubLightText,
-                                            modifier = Modifier
-                                                .clickable {
-                                                    val updatedProfile = activeChild.copy(currentScreenTime = 0.5f)
-                                                    updateActiveChild(updatedProfile)
-                                                }
-                                                .padding(4.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // 3. Interactive Web activity simulated input
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = CardBackground),
-                                shape = RoundedCornerShape(16.dp),
-                                border = BorderStroke(1.dp, LuxuryAmber.copy(alpha = 0.2f))
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = "Simulador Inteligente do Filho 📱",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = LuxuryAmber
-                                    )
-                                    Text(
-                                        text = "Digite abaixo um termo de pesquisa ou site (ex: 'equação matemática' ou 'porno de graça') para ver as restrições, alertas imediatos de 18+ e registo no painel.",
-                                        fontSize = 11.sp,
-                                        color = SubLightText,
-                                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
-                                    )
-
-                                    OutlinedTextField(
-                                        value = simulationInputText,
-                                        onValueChange = { simulationInputText = it },
-                                        placeholder = { Text("Pesquisa no Google ou site...", fontSize = 13.sp, color = SubLightText) },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 12.dp)
-                                            .testTag("child_sim_text_input"),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            unfocusedBorderColor = SubLightText.copy(alpha = 0.4f),
-                                            focusedBorderColor = LuxuryAmber,
-                                            focusedTextColor = LightText,
-                                            unfocusedTextColor = LightText
-                                        ),
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                        keyboardActions = KeyboardActions(onDone = {
-                                            if (simulationInputText.trim().isNotEmpty()) {
-                                                // Run check
-                                                val input = simulationInputText.trim().lowercase(Locale.ROOT)
-                                                val adultKeywords = listOf("porno", "sexo", "pornhub", "xxx", "xvideos", "xnxx", "hentai", "brasileirinhas")
-                                                val containAdult = adultKeywords.any { input.contains(it) } || 
-                                                        customKeywordsString.split(",").map { it.trim().lowercase(Locale.ROOT) }.any { it.isNotEmpty() && input.contains(it) }
-                                                
-                                                if (automaticFilterEnabled && containAdult) {
-                                                    triggerParentAlert(simulationInputText, "Adulto")
-                                                } else {
-                                                    viewModel.addParentLog(simulationInputText, "Seguro", false, childEmail = childEmail)
-                                                    Toast.makeText(context, "Conteúdo seguro consultado!", Toast.LENGTH_SHORT).show()
-                                                }
-                                                simulationInputText = ""
-                                            }
-                                        })
-                                    )
-
-                                    Button(
-                                        onClick = {
-                                            if (simulationInputText.trim().isNotEmpty()) {
-                                                val input = simulationInputText.trim().lowercase(Locale.ROOT)
-                                                val adultKeywords = listOf("porno", "sexo", "pornhub", "xxx", "xvideos", "xnxx", "hentai", "brasileirinhas")
-                                                val containAdult = adultKeywords.any { input.contains(it) } || 
-                                                        customKeywordsString.split(",").map { it.trim().lowercase(Locale.ROOT) }.any { it.isNotEmpty() && input.contains(it) }
-                                                
-                                                if (automaticFilterEnabled && containAdult) {
-                                                    triggerParentAlert(simulationInputText, "Adulto")
-                                                } else {
-                                                    viewModel.addParentLog(simulationInputText, "Seguro", false, childEmail = childEmail)
-                                                    Toast.makeText(context, "Consultado com segurança!", Toast.LENGTH_SHORT).show()
-                                                }
-                                                simulationInputText = ""
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = LuxuryAmber),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .testTag("btn_run_child_simulation"),
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text("Simular Acesso do Filho", fontSize = 12.sp, color = SlateBackground, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-
-                        // 4. Quick Stats summary info
-                        item {
+                item {
+                    val isServiceEnabled = isAccessibilityServiceEnabled(context)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardBackground),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Card(
-                                    modifier = Modifier.weight(1f),
-                                    colors = CardDefaults.cardColors(containerColor = CardBackground)
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text("Alertas (+18) Hoje", fontSize = 10.sp, color = SubLightText)
-                                        Text(
-                                            text = "${parentLogs.count { it.isAlert }}",
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = AlertRed,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        )
-                                    }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Filtro Ativo (Serviço de Acessibilidade)",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isServiceEnabled) "Serviço Ligado e Ativo" else "Serviço Desligado nas definições do sistema",
+                                        fontSize = 11.sp,
+                                        color = if (isServiceEnabled) Color(0xFF10B981) else Color(0xFFF59E0B)
+                                    )
                                 }
-                                Card(
-                                    modifier = Modifier.weight(1f),
-                                    colors = CardDefaults.cardColors(containerColor = CardBackground)
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text("Acessos Seguros", fontSize = 10.sp, color = SubLightText)
-                                        Text(
-                                            text = "${parentLogs.count { !it.isAlert }}",
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = EmeraldGreen,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        )
+                                Switch(
+                                    checked = isAccessibilityServiceEnabled(context) && isPremiumUnlocked,
+                                    onCheckedChange = {
+                                        if (!isPremiumUnlocked) {
+                                            showPremiumDialog = true
+                                        } else {
+                                            // Open Android accessibility settings
+                                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                            context.startActivity(intent)
+                                        }
                                     }
+                                )
+                            }
+
+                            if (!isServiceEnabled) {
+                                Button(
+                                    onClick = {
+                                        if (!isPremiumUnlocked) {
+                                            showPremiumDialog = true
+                                        } else {
+                                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                            context.startActivity(intent)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Text("Ligar nas Configurações do Celular", fontSize = 12.sp)
                                 }
                             }
                         }
                     }
+                }
 
-                    1 -> { // LOGS HISTORY LIST (Discovering kid's internet views)
-                        item {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardBackground),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Bloqueio de Conteúdo Guardião",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        text = "Intercetar termos e sites de teor adulto.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Switch(
+                                    checked = (blockerSettings?.isBlockerEnabled ?: false) && isPremiumUnlocked,
+                                    onCheckedChange = {
+                                        if (!isPremiumUnlocked) {
+                                            showPremiumDialog = true
+                                        } else {
+                                            viewModel.updateBlockerEnabled(it)
+                                        }
+                                    }
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Modo Estrito (Modo Extremo)",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        text = "Filtro redobrado para redes sociais e palavras suspeitas.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Switch(
+                                    checked = (blockerSettings?.strictMode ?: false) && isPremiumUnlocked,
+                                    onCheckedChange = {
+                                        if (!isPremiumUnlocked) {
+                                            showPremiumDialog = true
+                                        } else {
+                                            viewModel.updateStrictMode(it)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Section 2: Email alert recipient
+                item {
+                    Text(
+                        text = "Configuração do Email de Relatório",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardBackground),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Email do Guardião para Alertas",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "As notificações de bloqueios e recaídas serão registadas e encaminhadas para este email.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            OutlinedTextField(
+                                value = emailField,
+                                onValueChange = { emailField = it },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = {
+                                    context.getSharedPreferences("vencer_prefs", Context.MODE_PRIVATE)
+                                        .edit()
+                                        .putString("parent_child_email", emailField)
+                                        .apply()
+                                    showEmailSavedMessage = true
+                                },
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Text("Guardar Email")
+                            }
+
+                            if (showEmailSavedMessage) {
+                                Text(
+                                    text = "Email do Guardião guardado com sucesso!",
+                                    color = Color(0xFF10B981),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Section: Premium & Subscription Management
+                item {
+                    Text(
+                        text = "Gestão de Plano e Assinatura",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardBackground),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Atividades de Internet Detetadas (${parentLogs.size})",
-                                    fontSize = 15.sp,
+                                    text = "Estado da Assinatura",
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = LightText
+                                    color = MaterialTheme.colorScheme.onBackground
                                 )
-
-                                Text(
-                                    text = "Limpar Tudo",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AlertRed,
-                                    modifier = Modifier
-                                        .clickable {
-                                            viewModel.clearParentLogs()
-                                            Toast.makeText(context, "Histórico limpo!", Toast.LENGTH_SHORT).show()
-                                        }
-                                        .padding(4.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                        }
-
-                        if (parentLogs.isEmpty()) {
-                            item {
                                 Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = CardBackground.copy(alpha = 0.5f))
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isPremiumUnlocked) Color(0xFFD1FAE5) else Color(0xFFFEF3C7)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(32.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.FilterFrames,
-                                            contentDescription = null,
-                                            tint = SubLightText,
-                                            modifier = Modifier.size(48.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text(
-                                            text = "Nenhum histórico registado ainda.",
-                                            fontSize = 13.sp,
-                                            color = LightText,
-                                            textAlign = TextAlign.Center
-                                        )
-                                        Text(
-                                            text = "Use o Simulador no painel principal ou configure as chaves de monitoramento.",
-                                            fontSize = 11.sp,
-                                            color = SubLightText,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            items(parentLogs) { log ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 2.dp),
-                                    colors = CardDefaults.cardColors(containerColor = CardBackground),
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(
-                                        width = 0.5.dp,
-                                        color = if (log.isAlert) AlertRed.copy(alpha = 0.3f) else EmeraldGreen.copy(alpha = 0.15f)
+                                    Text(
+                                        text = if (isPremiumUnlocked) "PREMIUM ATIVO" else if (isTrialExpired) "TESTE EXPIRADO" else "PERÍODO DE TESTE (2 DIAS)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isPremiumUnlocked) Color(0xFF065F46) else Color(0xFF92400E),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(if (log.isAlert) AlertRed.copy(alpha = 0.1f) else EmeraldGreen.copy(alpha = 0.1f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = if (log.isAlert) Icons.Default.ErrorOutline else Icons.Default.CheckCircleOutline,
-                                                contentDescription = null,
-                                                tint = if (log.isAlert) AlertRed else EmeraldGreen,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                ) {
-                                                    Text(
-                                                        text = if (log.isAlert) "ALERTA (+18)" else "Acesso Seguro",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = if (log.isAlert) AlertRed else EmeraldGreen
-                                                    )
-                                                    if (log.childEmail.isNotEmpty()) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .background(SubLightText.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
-                                                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                                                        ) {
-                                                            Text(
-                                                                text = log.childEmail,
-                                                                fontSize = 9.sp,
-                                                                color = SubLightText,
-                                                                fontWeight = FontWeight.Medium
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                val sdf = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-                                                Text(
-                                                    text = sdf.format(Date(log.timestamp)),
-                                                    fontSize = 10.sp,
-                                                    color = SubLightText
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = log.searchQueryOrUrl,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = LightText,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = "Ação: ${log.actionTaken}",
-                                                fontSize = 10.sp,
-                                                color = SubLightText,
-                                                fontWeight = FontWeight.Light
-                                            )
-                                        }
-                                    }
                                 }
                             }
-                        }
-                    }
 
-                    2 -> { // RESTRICTIONS & PARENT SETTINGS
-                        item {
+                            Spacer(modifier = Modifier.height(12.dp))
+
                             Text(
-                                text = "Configurações de Regra & Filtros",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = LightText,
-                                modifier = Modifier.padding(bottom = 6.dp)
+                                text = "Configuração de Conta M-Pesa de Destino",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
                             )
-                        }
+                            Text(
+                                text = "Abaixo, defina a conta M-Pesa que receberá as subscrições dos usuários.",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                            )
 
-                        // 1. Automatic 18+ Content Filter Toggle
-                        item {
-                            Card(
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = editMpesaNumber,
+                                onValueChange = { editMpesaNumber = it },
+                                label = { Text("Número M-Pesa de Recebimento", fontSize = 11.sp) },
+                                singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = CardBackground)
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = editMpesaName,
+                                onValueChange = { editMpesaName = it },
+                                label = { Text("Nome do Titular M-Pesa", fontSize = 11.sp) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                Button(
+                                    onClick = {
+                                        viewModel.updateMpesaDetails(editMpesaNumber, editMpesaName)
+                                        showPaymentSavedMessage = true
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Bloqueador Automático +18",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = LightText
-                                        )
-                                        Text(
-                                            text = "Integra e bloqueia mais de 15,000 mil domínios conhecidos pornô em português.",
-                                            fontSize = 11.sp,
-                                            color = SubLightText,
-                                            modifier = Modifier.padding(top = 2.dp, end = 12.dp)
-                                        )
-                                    }
-                                    
-                                    Switch(
-                                        checked = automaticFilterEnabled,
-                                        onCheckedChange = { isChecked ->
-                                            val updated = activeChild.copy(autoFilterEnabled = isChecked)
-                                            updateActiveChild(updated)
-                                            Toast.makeText(context, if (isChecked) "Filtro Ativado para ${activeChild.name}!" else "Filtro desativado.", Toast.LENGTH_SHORT).show()
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = SlateBackground,
-                                            checkedTrackColor = EmeraldGreen
-                                        ),
-                                        modifier = Modifier.testTag("parent_toggle_block_adult")
-                                    )
+                                    Text("Guardar M-Pesa", fontSize = 11.sp, color = Color.Black)
                                 }
                             }
-                        }
 
-                        // 2. Limit Stepper Slider Configuration
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = CardBackground)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = "Configurar Limite de Ecrã",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = LightText
-                                    )
-                                    Text(
-                                        text = "Defina o número de horas permitidas por dia no smartphone do seu filho.",
-                                        fontSize = 11.sp,
-                                        color = SubLightText,
-                                        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
-                                    )
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "${screenTimeLimitHours.toInt()} Horas Diárias",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = EmeraldGreen
-                                        )
-                                    }
-
-                                    Slider(
-                                        value = screenTimeLimitHours,
-                                        onValueChange = { newValue ->
-                                            /* auto sync */
-                                            val updated = activeChild.copy(screenTimeLimit = newValue)
-                                             updateActiveChild(updated)
-                                        },
-                                        valueRange = 1f..8f,
-                                        steps = 6,
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = EmeraldGreen,
-                                            activeTrackColor = EmeraldGreen,
-                                            inactiveTrackColor = SlateBackground
-                                        ),
-                                        modifier = Modifier.testTag("parent_screen_time_slider")
-                                    )
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "Bloquear ao atinjir o Limite",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = LightText
-                                            )
-                                            Text(
-                                                text = "Restringe o ecrã do filho se o tempo passar as horas limites.",
-                                                fontSize = 10.sp,
-                                                color = SubLightText
-                                            )
-                                        }
-
-                                        Switch(
-                                            checked = blockWhenLimitExceeded,
-                                            onCheckedChange = { isChecked ->
-                                                /* sync */
-                                                val updated = activeChild.copy(blockExceeded = isChecked)
-                                                updateActiveChild(updated)
-                                            },
-                                            colors = SwitchDefaults.colors(
-                                                checkedThumbColor = SlateBackground,
-                                                checkedTrackColor = EmeraldGreen
-                                            ),
-                                            modifier = Modifier.testTag("parent_toggle_lock_exceeded")
-                                        )
-                                    }
-                                }
+                            if (showPaymentSavedMessage) {
+                                Text(
+                                    text = "Conta de recebimento M-Pesa guardada!",
+                                    color = Color(0xFF10B981),
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
                             }
-                        }
 
-                        // 3. Custom Blacklist / Keywords manager
-                        item {
-                            Card(
+                            Divider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f))
+
+                            Text(
+                                text = "Ações Rápidas de Simulação (Desenvolvedor/Suporte)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = CardBackground)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = "Restringir Palavras Customizadas",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = LightText
-                                    )
-                                    Text(
-                                        text = "Adicione palavras ou redes sociais que deseja proibir que seu filho procure (ex: facebook, tinder).",
-                                        fontSize = 11.sp,
-                                        color = SubLightText,
-                                        modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
-                                    )
+                                Button(
+                                    onClick = {
+                                        viewModel.forceTrialExpiration()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                    contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                                ) {
+                                    Text("Forçar Expiração", fontSize = 10.sp, maxLines = 1)
+                                }
 
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        OutlinedTextField(
-                                            value = newKeywordInputText,
-                                            onValueChange = { newKeywordInputText = it },
-                                            placeholder = { Text("palavra-chave...", fontSize = 12.sp, color = SubLightText) },
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .testTag("new_keyword_text_input"),
-                                            shape = RoundedCornerShape(8.dp),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                unfocusedBorderColor = SubLightText.copy(alpha = 0.3f),
-                                                focusedBorderColor = EmeraldGreen,
-                                                focusedTextColor = LightText,
-                                                unfocusedTextColor = LightText
-                                            ),
-                                            singleLine = true,
-                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
-                                        )
+                                Button(
+                                    onClick = {
+                                        viewModel.resetTrial()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                    contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                                ) {
+                                    Text("Reiniciar Teste", fontSize = 10.sp, maxLines = 1)
+                                }
 
-                                        Button(
-                                            onClick = {
-                                                val cleanVal = newKeywordInputText.trim().lowercase(Locale.ROOT)
-                                                if (cleanVal.isNotEmpty()) {
-                                                    val parts = customKeywordsString.split(",")
-                                                        .map { it.trim().lowercase(Locale.ROOT) }
-                                                        .filter { it.isNotEmpty() }
-                                                        .toMutableList()
-                                                    
-                                                    if (!parts.contains(cleanVal)) {
-                                                        parts.add(cleanVal)
-                                                    }
-                                                    customKeywordsString = parts.joinToString(", ")
-                                                    sharedPrefs.edit().putString("parent_custom_keywords", customKeywordsString).apply()
-                                                    newKeywordInputText = ""
-                                                    Toast.makeText(context, "Palavra-chave bloqueada!", Toast.LENGTH_SHORT).show()
-                                                }
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen),
-                                            modifier = Modifier
-                                                .height(50.dp)
-                                                .testTag("btn_add_restr_keyword")
-                                        ) {
-                                            Text("Bloquear", fontSize = 12.sp, color = SlateBackground, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(14.dp))
-
-                                    Text(
-                                        text = "Lista Ativa:",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = LightText
-                                    )
-
-                                    // Display list items as horizontal wrap rows
-                                    val keywordsList = customKeywordsString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                                    if (keywordsList.isEmpty()) {
-                                        Text(
-                                            text = "Nenhuma restrição especial.",
-                                            fontSize = 11.sp,
-                                            color = SubLightText,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        )
-                                    } else {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 6.dp)
-                                                .horizontalScroll(rememberScrollState()),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            keywordsList.forEach { kw ->
-                                                SuggestionChip(
-                                                    onClick = {
-                                                        // Remove it on click
-                                                        val updated = keywordsList.toMutableList().apply { remove(kw) }
-                                                        customKeywordsString = updated.joinToString(", ")
-                                                        sharedPrefs.edit().putString("parent_custom_keywords", customKeywordsString).apply()
-                                                        Toast.makeText(context, "Desbloqueado: $kw", Toast.LENGTH_SHORT).show()
-                                                    },
-                                                    label = {
-                                                        Row(
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                        ) {
-                                                            Text(text = kw, fontSize = 11.sp, color = LightText)
-                                                            Icon(Icons.Default.Close, contentDescription = "Remover", modifier = Modifier.size(12.dp), tint = AlertRed)
-                                                        }
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    colors = SuggestionChipDefaults.suggestionChipColors(
-                                                        containerColor = SlateBackground
-                                                    ),
-                                                    border = BorderStroke(1.dp, AlertRed.copy(alpha = 0.3f))
-                                                )
-                                            }
-                                        }
-                                    }
+                                Button(
+                                    onClick = {
+                                        viewModel.unlockPremium()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                    contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                                ) {
+                                    Text("Ativar Premium", fontSize = 10.sp, maxLines = 1, color = Color.White)
                                 }
                             }
                         }
                     }
                 }
+
+                // Section 3: Monitoring Logs
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Histórico de Intercetações",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        TextButton(onClick = { viewModel.clearLogs() }) {
+                            Text("Limpar Logs", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+
+                if (parentLogs.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = CardBackground),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shield,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Nenhuma intercetação registada.",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        text = "O dispositivo está limpo e seguro.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    items(parentLogs) { log ->
+                        LogItemCard(log)
+                    }
+                }
             }
         }
     }
+
+    if (showPremiumDialog) {
+        AlertDialog(
+            onDismissRequest = { showPremiumDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Ativar Vencer Premium", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "O Guardião é um recurso avançado que interceta sites e termos de teor adulto/pornográfico para manter a sua mente limpa.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Esta funcionalidade requer a licença ativa do Vencer Premium por apenas 150 MT (válida por 30 dias).",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Instruções de pagamento:\n1. Envie 150 MT via M-Pesa para o número:\n   -> $mpesaNumber ($mpesaName)\n2. Tire um print screen do comprovante\n3. Envie o comprovante na tela do painel do usuário.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showPremiumDialog = false
+                        onBack()
+                        onUpgradeClick()
+                    }
+                ) {
+                    Icon(Icons.Default.Payment, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Pagar Licença Pro", fontSize = 12.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPremiumDialog = false }) {
+                    Text("Depois")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun LogItemCard(log: ParentLog) {
+    val date = Date(log.timestamp)
+    val format = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+    val formattedDate = format.format(date)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = log.actionTaken,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = formattedDate,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = log.searchQueryOrUrl,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Destinatário do Alerta: ${log.childEmail}",
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
+fun isAccessibilityServiceEnabled(context: Context): Boolean {
+    val expectedComponentName = "${context.packageName}/com.example.blocker.PurityBoundaryService"
+    val enabledServices = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    ) ?: return false
+    return enabledServices.contains(expectedComponentName) || enabledServices.contains("PurityBoundaryService")
 }
