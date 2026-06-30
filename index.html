@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="pt-PT" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vencer — Vença a Pornografia e Recupere a sua Vida</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            900: '#090d16',
+                            800: '#0f172a',
+                            700: '#1e293b',
+                            600: '#334155',
+                            accent: '#6366f1',
+                            secondary: '#06b6d4',
+                            success: '#10b981',
+                            warning: '#f59e0b',
+                            danger: '#e11d48',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glowing-border:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 50%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+    </style>
+</head>
+<body class="custom-scrollbar antialiased overflow-x-hidden">
+
+    <!-- Glowing Background blobs -->
+    <div class="absolute top-0 left-1/4 w-[500px] h-[500px] bg-cyber-accent/10 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+    <div class="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-cyber-secondary/10 rounded-full blur-[150px] pointer-events-none -z-10"></div>
+    <div class="absolute bottom-1/4 left-10 w-[450px] h-[450px] bg-cyber-danger/5 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+
+    <!-- Navigation Header -->
+    <header class="sticky top-0 z-50 w-full glass-panel border-b border-white/5 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <!-- Logo -->
+                <a href="#" class="flex items-center gap-3 group">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyber-accent to-cyber-secondary flex items-center justify-center shadow-lg shadow-cyber-accent/20 group-hover:scale-105 transition-transform">
+                        <span class="material-symbols-outlined text-white font-bold select-none">shield_with_heart</span>
+                    </div>
+                    <div>
+                        <span class="text-xl font-extrabold tracking-wider text-white">VENCER</span>
+                        <span class="block text-[9px] font-semibold text-cyber-secondary tracking-widest uppercase">Moçambique</span>
+                    </div>
+                </a>
+
+                <!-- Desktop Nav Links -->
+                <nav class="hidden md:flex items-center gap-8">
+                    <a href="#funcionalidades" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">Funcionalidades</a>
+                    <a href="#guardiao" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">O Guardião</a>
+                    <a href="#premium" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">Premium License</a>
+                    <a href="#instalacao" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">Guia de Instalação</a>
+                </nav>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-4">
+                    <a href="#instalacao" class="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 text-sm font-semibold border border-white/10 transition-all">
+                        Como Instalar
+                    </a>
+                    <a href="#descarregar" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyber-accent to-cyber-secondary hover:opacity-95 text-white text-sm font-semibold shadow-lg shadow-cyber-accent/25 hover:shadow-cyber-accent/35 transform hover:-translate-y-0.5 transition-all">
+                        <span class="material-symbols-outlined text-sm">download</span>
+                        Descarregar APK
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="relative pt-10 pb-20 lg:pt-16 lg:pb-32 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                <!-- Hero Text -->
+                <div class="lg:col-span-7 space-y-8 text-center lg:text-left">
+                    <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyber-accent/10 border border-cyber-accent/20">
+                        <span class="w-2 h-2 rounded-full bg-cyber-accent animate-pulse"></span>
+                        <span class="text-xs font-semibold text-indigo-300 uppercase tracking-wider">Desenvolvido em Moçambique</span>
+                    </div>
+
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-none text-white">
+                        Vença a pornografia.<br class="hidden sm:block">
+                        <span class="gradient-text">Liberte a sua mente.</span>
+                    </h1>
+
+                    <p class="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+                        O primeiro aplicativo móvel moçambicano que combina <strong>Inteligência Artificial</strong>, 
+                        <strong>Rastreador de Sobriedade</strong> e um <strong>Bloqueador Inteligente (Guardião)</strong> 
+                        para te apoiar no caminho da liberdade mental e espiritual.
+                    </p>
+
+                    <!-- Features badgified -->
+                    <div class="flex flex-wrap justify-center lg:justify-start gap-y-3 gap-x-6 text-sm text-slate-400">
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-cyber-success text-lg">check_circle</span>
+                            Guardião Bloqueador Ativo
+                        </span>
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-cyber-secondary text-lg">check_circle</span>
+                            Aconselhamento por IA 24/7
+                        </span>
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-cyber-accent text-lg">check_circle</span>
+                            Foco local via M-Pesa
+                        </span>
+                    </div>
+
+                    <!-- CTA Buttons -->
+                    <div class="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
+                        <a href="#descarregar" class="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-cyber-accent to-cyber-secondary text-white font-bold text-lg shadow-xl shadow-cyber-accent/30 hover:shadow-cyber-accent/40 transform hover:-translate-y-1 transition-all">
+                            <span class="material-symbols-outlined">download</span>
+                            Instalar APK Grátis
+                        </a>
+                        <a href="#funcionalidades" class="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-bold text-lg hover:text-white transition-all">
+                            Conhecer Recursos
+                            <span class="material-symbols-outlined">arrow_downward</span>
+                        </a>
+                    </div>
+
+                    <!-- Small App Info badge -->
+                    <div class="pt-2 text-xs text-slate-400 flex items-center justify-center lg:justify-start gap-2">
+                        <span class="material-symbols-outlined text-sm">security</span>
+                        100% Confidencial. Nenhum dado é vendido ou exposto.
+                    </div>
+                </div>
+
+                <!-- Hero Graphic Mockup -->
+                <div class="lg:col-span-5 flex justify-center">
+                    <div class="relative w-full max-w-[420px] aspect-[16/9] lg:aspect-auto">
+                        <!-- Glow effect -->
+                        <div class="absolute -inset-2 bg-gradient-to-tr from-cyber-accent to-cyber-secondary rounded-[40px] blur-xl opacity-30 animate-pulse"></div>
+                        <!-- Hero Image from drawable -->
+                        <div class="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl glass-panel">
+                            <img src="./vencer_hero.jpg" alt="Vencer App Hero Graphic" class="w-full object-cover rounded-3xl hover:scale-105 transition-transform duration-700">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Key App Stats/Indicators -->
+    <section class="py-12 border-y border-white/5 bg-slate-950/40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                <div class="space-y-1">
+                    <span class="block text-3xl sm:text-4xl font-extrabold text-white">100%</span>
+                    <span class="block text-xs sm:text-sm text-slate-400 font-medium">Privacidade e Sigilo</span>
+                </div>
+                <div class="space-y-1">
+                    <span class="block text-3xl sm:text-4xl font-extrabold text-cyber-secondary">2 Dias</span>
+                    <span class="block text-xs sm:text-sm text-slate-400 font-medium">Teste Gratuito Total</span>
+                </div>
+                <div class="space-y-1">
+                    <span class="block text-3xl sm:text-4xl font-extrabold text-cyber-accent">150 MT</span>
+                    <span class="block text-xs sm:text-sm text-slate-400 font-medium">Preço Licença de 30 Dias</span>
+                </div>
+                <div class="space-y-1">
+                    <span class="block text-3xl sm:text-4xl font-extrabold text-cyber-success">Instantâneo</span>
+                    <span class="block text-xs sm:text-sm text-slate-400 font-medium">Ativação via IA</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="funcionalidades" class="py-20 lg:py-32">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
+                <span class="text-xs font-bold text-cyber-secondary uppercase tracking-widest">Proteção Avançada</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">O que você ganha com o Vencer?</h2>
+                <p class="text-slate-400 text-base sm:text-lg">
+                    Um ecossistema desenhado meticulosamente para fortalecer a sua mente contra impulsos, dando-lhe o controle absoluto.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="glass-panel p-8 rounded-3xl glowing-border border border-white/5 transition-all duration-300 flex flex-col justify-between">
+                    <div>
+                        <div class="w-12 h-12 rounded-2xl bg-cyber-accent/10 text-cyber-accent flex items-center justify-center mb-6">
+                            <span class="material-symbols-outlined text-2xl font-bold">query_stats</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Rastreador de Sobriedade</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed mb-6">
+                            Visualize seu progresso em tempo real com um cronômetro de alta precisão que calcula dias, horas, minutos e segundos livres. Registre recaídas e mantenha o registro histórico de suas vitórias.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs font-semibold text-cyber-accent">
+                        Ver histórico e estatísticas
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </div>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="glass-panel p-8 rounded-3xl glowing-border border border-white/5 transition-all duration-300 flex flex-col justify-between">
+                    <div>
+                        <div class="w-12 h-12 rounded-2xl bg-cyber-secondary/10 text-cyber-secondary flex items-center justify-center mb-6">
+                            <span class="material-symbols-outlined text-2xl font-bold">chat</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Conselheiro IA Inteligente</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed mb-6">
+                            Integrado diretamente com o Google Gemini. Em momentos de forte tentação ou gatilhos, abra o conselheiro e converse em total privacidade. Receba estratégias cognitivas práticas e compassionadas imediatamente.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs font-semibold text-cyber-secondary">
+                        Apoio em tempo real sem julgamentos
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </div>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="glass-panel p-8 rounded-3xl glowing-border border border-white/5 transition-all duration-300 flex flex-col justify-between">
+                    <div>
+                        <div class="w-12 h-12 rounded-2xl bg-cyber-danger/10 text-cyber-danger flex items-center justify-center mb-6">
+                            <span class="material-symbols-outlined text-2xl font-bold">shield</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-3">Bloqueador Guardião</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed mb-6">
+                            Interceta a navegação em qualquer navegador e redes sociais no Android. Ao tentar acessar um site pornográfico ou pesquisar termos adultos, a tela do app bloqueia o acesso imediatamente.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs font-semibold text-cyber-danger">
+                        Filtro robusto com senha personalizada
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Guardian Lock & Passcode Feature Highlight -->
+    <section id="guardiao" class="py-20 lg:py-32 bg-slate-950/30 border-y border-white/5 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                <!-- Phone UI mockup illustration in HTML -->
+                <div class="lg:col-span-5 order-2 lg:order-1 flex justify-center">
+                    <div class="w-full max-w-[340px] glass-panel rounded-[40px] border-4 border-slate-700/80 p-3 shadow-2xl relative">
+                        <!-- Top Notch -->
+                        <div class="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-4 bg-slate-700 rounded-full z-10"></div>
+                        
+                        <!-- Internal content -->
+                        <div class="bg-[#090d16] rounded-[32px] overflow-hidden p-6 aspect-[9/19] flex flex-col justify-between border border-white/5">
+                            <!-- Status bar -->
+                            <div class="flex justify-between items-center text-[10px] text-slate-500 mb-4 pt-1">
+                                <span>08:15</span>
+                                <div class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-xs">wifi</span>
+                                    <span class="material-symbols-outlined text-xs">battery_full</span>
+                                </div>
+                            </div>
+
+                            <!-- Screen 1: Passcode Block Mockup -->
+                            <div class="flex-1 flex flex-col justify-center items-center text-center space-y-4">
+                                <span class="material-symbols-outlined text-cyber-danger text-5xl">lock</span>
+                                <h4 class="text-base font-bold text-white">Painel do Guardião Bloqueado</h4>
+                                <p class="text-[11px] text-slate-400 max-w-[200px]">
+                                    Insira o código PIN de segurança definido pelo seu padrinho de sobriedade ou guardião.
+                                </p>
+                                
+                                <!-- Fake Pin dots -->
+                                <div class="flex gap-2 justify-center py-2">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-cyber-accent"></div>
+                                    <div class="w-2.5 h-2.5 rounded-full bg-cyber-accent"></div>
+                                    <div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+                                    <div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+                                </div>
+
+                                <!-- Keypad preview -->
+                                <div class="grid grid-cols-3 gap-2 w-full max-w-[180px] text-xs pt-2">
+                                    <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-300 mx-auto">1</div>
+                                    <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-300 mx-auto">2</div>
+                                    <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-300 mx-auto">3</div>
+                                </div>
+                            </div>
+
+                            <!-- App bottom tag -->
+                            <div class="text-center text-[9px] text-slate-600 font-semibold uppercase tracking-wider mt-4">
+                                Vencer Proteção Máxima
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Text info -->
+                <div class="lg:col-span-7 order-1 lg:order-2 space-y-8">
+                    <span class="text-xs font-bold text-cyber-danger uppercase tracking-widest">Controle de Autossabotagem</span>
+                    <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                        Crie uma Senha do Guardião para evitar autossabotagem
+                    </h2>
+                    
+                    <p class="text-slate-300 text-base leading-relaxed">
+                        Nos momentos de forte compulsão, o cérebro tenta racionalizar e desativar os bloqueios. 
+                        Com o <strong>Vencer</strong>, você primeiro cria uma senha personalizada do guardião. 
+                        <strong>Dica de ouro:</strong> Peça a um amigo de confiança, padrinho de sobriedade ou cônjuge para definir essa senha por você. 
+                        Dessa forma, você não poderá desativar o bloqueador nos momentos de fraqueza!
+                    </p>
+
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-4">
+                            <div class="w-8 h-8 rounded-lg bg-cyber-accent/10 text-cyber-accent flex items-center justify-center flex-shrink-0 mt-1">
+                                <span class="material-symbols-outlined text-sm">enhanced_encryption</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white text-sm">Sem Senhas Padrão</h4>
+                                <p class="text-xs text-slate-400">Você deve criar seu próprio PIN numérico forte de 4 a 6 dígitos na primeira vez que acessar o painel do Guardião.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div class="w-8 h-8 rounded-lg bg-cyber-danger/10 text-cyber-danger flex items-center justify-center flex-shrink-0 mt-1">
+                                <span class="material-symbols-outlined text-sm">block</span>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white text-sm">Não há contorno</h4>
+                                <p class="text-xs text-slate-400">O bloqueador fica integrado à nível de sistema com o Serviço de Acessibilidade do Android, impedindo desativações rápidas.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Trial Expired Warning & Premium Licensing -->
+    <section id="premium" class="py-20 lg:py-32">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
+                <span class="text-xs font-bold text-cyber-warning uppercase tracking-widest">Preços e Licenciamento</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Proteção Contínua e Acessível</h2>
+                <p class="text-slate-400 text-sm sm:text-base">
+                    Nós oferecemos 2 dias inteiros de teste gratuito com o aplicativo totalmente desbloqueado. Para manter o aplicativo e o Bloqueador Guardião ativos após os 2 dias, você deve adquirir a licença de 30 dias.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center max-w-5xl mx-auto">
+                <!-- Warning Notice Box -->
+                <div class="lg:col-span-5 bg-cyber-danger/10 border border-cyber-danger/20 rounded-3xl p-8 space-y-6">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-cyber-danger text-3xl">warning</span>
+                        <h4 class="font-extrabold text-white text-lg">Regras do Teste de 2 Dias</h4>
+                    </div>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Durante o teste gratuito de 2 dias, você pode explorar o Rastreador e conversar com o Conselheiro IA. No entanto, <strong>o Bloqueador Guardião ativo de pornografia requer a licença ativa</strong> para funcionar plenamente e filtrar conteúdo adulto.
+                    </p>
+                    <div class="p-4 bg-slate-950/50 rounded-2xl border border-white/5 space-y-2">
+                        <span class="block text-xs font-bold text-white">Deseja ativar imediatamente?</span>
+                        <p class="text-[11px] text-slate-400">
+                            Não é necessário esperar que os 2 dias de teste gratuito expirem! Você pode efetuar o pagamento da licença PRO de 30 dias imediatamente ao instalar o app para ativar todos os filtros de proteção sem interrupções.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Pricing Card -->
+                <div class="lg:col-span-7 bg-gradient-to-b from-[#131b2e] to-[#0d1424] border-2 border-cyber-accent rounded-3xl p-8 lg:p-10 relative overflow-hidden shadow-2xl shadow-cyber-accent/10">
+                    <div class="absolute top-0 right-0 bg-cyber-accent text-white text-[10px] font-extrabold tracking-widest uppercase px-4 py-1.5 rounded-bl-2xl">
+                        Mais Popular
+                    </div>
+
+                    <div class="space-y-6">
+                        <span class="text-xs font-bold text-indigo-300 tracking-wider uppercase">Plano Pro Mensal</span>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-5xl font-extrabold text-white">150 MT</span>
+                            <span class="text-slate-400 text-sm">/ 30 dias</span>
+                        </div>
+                        <p class="text-sm text-slate-300">
+                            Acesso completo e ilimitado a todas as ferramentas de proteção, Inteligência Artificial de ponta e bloqueador sistêmico avançado.
+                        </p>
+
+                        <div class="border-t border-white/10 my-6 pt-6 space-y-3.5 text-sm">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-cyber-success text-lg">verified</span>
+                                <span class="text-slate-200 text-xs sm:text-sm">Filtro de sites e buscas pornográficas ilimitado</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-cyber-success text-lg">verified</span>
+                                <span class="text-slate-200 text-xs sm:text-sm">Conselhos ilimitados com IA Google Gemini</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-cyber-success text-lg">verified</span>
+                                <span class="text-slate-200 text-xs sm:text-sm">Rastreador de tempo ativo e estatísticas</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-cyber-success text-lg">verified</span>
+                                <span class="text-slate-200 text-xs sm:text-sm">Painel do Guardião protegido por Senha Criada</span>
+                            </div>
+                        </div>
+
+                        <!-- Payment flow info -->
+                        <div class="p-4 bg-cyber-accent/5 rounded-2xl border border-cyber-accent/10 space-y-3">
+                            <span class="block text-xs font-bold text-indigo-300">Como pagar em Moçambique:</span>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left text-[11px] text-slate-400">
+                                <div>
+                                    <strong class="text-white block">1. Transferência M-Pesa</strong>
+                                    Envie 150 MT para o número cadastrado no seu aplicativo.
+                                </div>
+                                <div>
+                                    <strong class="text-white block">2. Validação instantânea por IA</strong>
+                                    Tire print screen do comprovante M-Pesa e faça upload dentro da tela de Premium do app. Nossa IA analisa e aprova na hora!
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation & Setup Guide -->
+    <section id="instalacao" class="py-20 lg:py-32 bg-slate-950/40 border-y border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
+                <span class="text-xs font-bold text-cyber-success uppercase tracking-widest">Guia Passo a Passo</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Como instalar e usar o Vencer?</h2>
+                <p class="text-slate-400 text-sm sm:text-base">
+                    Por ser um aplicativo com recursos de controle parental e filtro de sistema, ele é disponibilizado via APK. Siga os passos rápidos abaixo para configurar de forma segura em menos de 2 minutos.
+                </p>
+            </div>
+
+            <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+                <!-- Left instructions list -->
+                <div class="md:col-span-7 space-y-6">
+                    <div class="flex gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-cyber-accent/10 text-cyber-accent font-extrabold flex items-center justify-center flex-shrink-0">
+                            1
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-base">Descarregar o arquivo APK</h4>
+                            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                                Clique em qualquer botão de descarregamento nesta página para obter o instalador original e seguro do <strong>Vencer</strong>.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-cyber-accent/10 text-cyber-accent font-extrabold flex items-center justify-center flex-shrink-0">
+                            2
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-base">Permitir fontes desconhecidas</h4>
+                            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                                Vá nas Configurações do seu Android -> Segurança/Aplicativos -> Ativar "Instalar aplicativos de fontes desconhecidas" para o seu navegador ou gerenciador de arquivos.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <div class="w-10 h-10 rounded-xl bg-cyber-accent/10 text-cyber-accent font-extrabold flex items-center justify-center flex-shrink-0">
+                            3
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-white text-base">Criar a sua Senha e Ativar Acessibilidade</h4>
+                            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                                Abra o aplicativo, vá na aba do Guardião, defina a sua nova senha de 4 a 6 dígitos e conceda a permissão de Serviço de Acessibilidade quando solicitado. Pronto, você está protegido!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right download CTA box -->
+                <div id="descarregar" class="md:col-span-5 bg-gradient-to-br from-cyber-accent/10 to-cyber-secondary/5 rounded-3xl border border-white/10 p-8 text-center space-y-6">
+                    <span class="material-symbols-outlined text-cyber-accent text-5xl">android</span>
+                    <div class="space-y-2">
+                        <h4 class="font-extrabold text-white text-lg">Download Seguro</h4>
+                        <p class="text-[11px] text-slate-400">Versão estável e livre de vírus. Sintonizada com o fuso de Moçambique.</p>
+                    </div>
+
+                    <!-- Fake/Real Download link which can be customized by the user -->
+                    <a href="./app-release.apk" download class="inline-flex items-center justify-center gap-2 w-full py-4.5 rounded-2xl bg-gradient-to-r from-cyber-accent to-cyber-secondary hover:opacity-95 text-white font-bold text-base shadow-lg shadow-cyber-accent/20 transition-all">
+                        <span class="material-symbols-outlined">download_for_offline</span>
+                        Baixar APK (v1.2)
+                    </a>
+
+                    <p class="text-[10px] text-slate-500">
+                        *Se você exportou o arquivo APK a partir do menu do AI Studio, renomeie-o ou faça upload para a pasta raiz desta página como <code>app-release.apk</code> para que o download funcione diretamente.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-cyber-900 border-t border-white/5 py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <!-- Left side -->
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-cyber-accent flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-sm font-bold select-none">shield_with_heart</span>
+                    </div>
+                    <div>
+                        <span class="font-bold text-white tracking-wider text-sm">VENCER</span>
+                        <span class="block text-[8px] text-slate-500 uppercase font-semibold">Tecnologia para Sobriedade</span>
+                    </div>
+                </div>
+
+                <!-- Center text / Disclaimer -->
+                <p class="text-xs text-slate-500 max-w-md text-center md:text-left leading-relaxed">
+                    Aviso: O Vencer é uma ferramenta projetada exclusivamente para auxiliar na recuperação individual e autocontrole. Seus dados e seu progresso são armazenados localmente e criptografados de forma segura.
+                </p>
+
+                <!-- Right links -->
+                <div class="flex gap-6 text-xs text-slate-400">
+                    <a href="#" class="hover:text-white transition-colors">Termos</a>
+                    <a href="#" class="hover:text-white transition-colors">Privacidade</a>
+                    <a href="#premium" class="hover:text-cyber-accent transition-colors">Contacto M-Pesa</a>
+                </div>
+            </div>
+
+            <div class="mt-8 border-t border-white/5 pt-8 text-center text-[11px] text-slate-600">
+                &copy; 2026 Vencer App Moçambique. Todos os direitos reservados.
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
